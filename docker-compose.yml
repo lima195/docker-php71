@@ -1,0 +1,118 @@
+version: '3.1'
+services:
+  nginx:
+    container_name: container_nginx
+    image: nginx:latest
+    volumes:
+     - ./nginx_conf/default.conf:/etc/nginx/conf.d/default.conf
+     - ./nginx_conf/lojista.conf:/etc/nginx/conf.d/lojista.conf
+     - ../web:/usr/share/nginx/www
+    ports:
+      - 80:80
+      - 443:443
+    expose:
+      - 443
+    links:
+      - db
+      - php:container_php
+      - mail
+      - redis
+    depends_on:
+      - php
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.102
+
+  php:
+    container_name: container_php
+    build:
+      context: .
+      dockerfile: ./php/Dockerfile
+    volumes:
+     - ../web:/usr/share/nginx/www
+    ports:
+      - 9000:9000
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.104
+    # environment:
+    #   XDEBUG_CONFIG: remote_host=172.22.0.104 #docker network ip.
+    #   PHP_IDE_CONFIG: "serverName=xdebug-docker" #phpstorm variavel de ambiente com o nome do server configurado.
+
+  db:
+    container_name: container_mysql
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - ./volumes/mysql/volume:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: magento2
+      MYSQL_USER: magento2
+      MYSQL_PASSWORD: magento2
+      MYSQL_DATABASE: magento2
+    ports:
+      - 3306:3306
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.108
+
+  redis:
+    container_name: container_redis
+    image: redis:alpine
+    ports:
+      - 6379:6379
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.109
+
+  mail:
+    container_name: container_mailhog
+    image: mailhog/mailhog
+    command: ["-storage=maildir", "-maildir-path=/maildir"]
+    volumes:
+      - ./volumes/mailhog/volume:/maildir
+    restart: always
+    ports:
+      - 1025:1025
+      - 8025:8025
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.110
+
+  adminer:
+    container_name: container_adminer
+    image: adminer
+    restart: always
+    ports:
+      - 8222:8080
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.112
+    links:
+      - db
+
+  memcached:
+    container_name: container_memcached
+    image: memcached:alpine
+    volumes:
+      - ./volumes/memcached/volume:/maildir
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.114
+  
+  elasticsearch:
+    container_name: container_elasticsearch
+    image: elasticsearch:6.5.4
+    volumes:
+      - ./volumes/elasticsearch/volume:/maildir
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.116
+
+networks:
+  container_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.22.0.0/16
