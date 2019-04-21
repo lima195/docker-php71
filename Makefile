@@ -3,7 +3,7 @@
 ## Edit this vars:
 
 MYSQL_DUMP_FILE=database.sql
-BASE_URL=http://www.magento.localhost/
+BASE_URL=http://www.magento2.com/
 PROJECT_NAME=magento2
 
 ## CUSTOM VARS
@@ -14,6 +14,7 @@ PROJECT_NAME=magento2
 DOCKER_DIR=docker-php71
 
 NGINX_DOCKER=container_nginx
+PHP_DOCKER=container_php
 MYSQL_DOCKER=container_mysql
 NGINX_WEB_ROOT=/usr/share/nginx/www
 
@@ -22,11 +23,15 @@ MAGENTO_LOCAL_XML_TO=$(NGINX_WEB_ROOT)/app/etc/local.xml
 MAGENTO_MAGERUN=n98-magerun.phar
 MAGENTO_MAGERUN_TO=/usr/local/bin
 
+MAGENTO2_ENVPHP=../$(DOCKER_DIR)/etc/magento2/app/etc/env.php
+MAGENTO2_ENVPHP_TO=$(NGINX_WEB_ROOT)/app/etc/env.php
+
 MYSQL_DUMP_FILE_DIR=../mysql_dump
-MYSQL_USER=$(PROJECT_NAME)
+# MYSQL_USER=$(PROJECT_NAME)
+MYSQL_USER=root
 MYSQL_PASS=$(PROJECT_NAME)
 MYSQL_DB_NAME=$(PROJECT_NAME)
-MYSQL_HOST=172.22.0.108
+MYSQL_HOST=172.22.0.103
 MYSQL_PORT=3306
 
 default:
@@ -51,25 +56,32 @@ default:
 	@echo " - make magento_clear_cache"
 	@echo " - make magento_set_permissions"
 	@echo " "
+	@echo " == Magento 2 =="
+	@echo " - make setup_magento (This will run all tasks above)"
+	@echo " - make magento2_update_baseurl"
+	@echo " - make magento2_create_envphp"
+	@echo " - make magento2_composer_install"
+	@echo " - make magento_magerun_create_admin"
+	@echo " - make magento_cron_setup"
+	@echo " - make magento_clear_cache"
+	@echo " - make magento_set_permissions"
+	@echo " "
 	@echo " == Docker =="
 	@echo " - make install_cron"
 	@echo " - make docker_up"
 	@echo " "
 	@echo " == Custom tasks for project =="
 	@echo " "
-	@echo " - make magento_update_baseurl_store_2 (Needed to access lojista store view)"
 
 ## TASKS
 
 ## Custom Tasks
 
-magento_update_baseurl_store_2:
-	make magento_update_baseurl
-	sudo docker exec -it $(MYSQL_DOCKER) sh -c "mysql -u $(MYSQL_USER) -p$(MYSQL_PASS) -h $(MYSQL_HOST) $(MYSQL_DB_NAME) -e \"UPDATE core_config_data SET value = '$(BASE_URL_STORE_2)' WHERE path in ('web/unsecure/base_url', 'web/secure/base_url') AND scope = 'stores' AND scope_id = '2'\"" -P $(MYSQL_PORT)
-
 
 
 # Do not edit tasks above
+
+# DATABASE
 
 db_install_pv:
 	sudo docker exec -it $(MYSQL_DOCKER) sh -c "apt-get update; apt-get install -y pv"
@@ -85,6 +97,8 @@ db_import_pv:
 db_drop_tables:
 	sudo docker exec -it $(MYSQL_DOCKER) sh -c "mysqldump --add-drop-table --no-data -u $(MYSQL_USER) -p$(MYSQL_PASS) -h $(MYSQL_HOST) $(MYSQL_DB_NAME) -P $(MYSQL_PORT) | grep 'DROP TABLE' ) > ../mysql_dump/drop_all_tables.sql"
 	sudo docker exec -it $(MYSQL_DOCKER) sh -c "mysql -u $(MYSQL_USER) -p$(MYSQL_PASS) -h $(MYSQL_HOST) $(MYSQL_DB_NAME) < ../mysql_dump/drop_all_tables.sql -P $(MYSQL_PORT)"
+
+# MAGENTO
 
 magento_update_baseurl:
 	sudo docker exec -it $(MYSQL_DOCKER) sh -c "mysql -u $(MYSQL_USER) -p$(MYSQL_PASS) -h $(MYSQL_HOST) $(MYSQL_DB_NAME) -e \"UPDATE core_config_data SET value = '$(BASE_URL)' WHERE path in ('web/unsecure/base_url', 'web/secure/base_url')\"" -P $(MYSQL_PORT)
@@ -111,6 +125,57 @@ magento_cron_setup:
 	@echo "*/5 * * * * sh $(NGINX_WEB_ROOT)/cron.sh >/dev/null 2>&1"
 	sudo docker exec -it $(NGINX_DOCKER) sh -c "crontab -e"
 
+# MAGENTO2 
+
+magento2_update_baseurl:
+	sudo docker exec -it $(MYSQL_DOCKER) sh -c "mysql -u $(MYSQL_USER) -p$(MYSQL_PASS) -h $(MYSQL_HOST) $(MYSQL_DB_NAME) -e \"UPDATE core_config_data SET value = '$(BASE_URL)' WHERE path in ('web/unsecure/base_url', 'web/secure/base_url')\"" -P $(MYSQL_PORT)
+
+magento2_create_phpenv:
+	sudo docker cp $(MAGENTO2_ENVPHP) $(NGINX_DOCKER):/$(MAGENTO2_ENVPHP_TO);
+
+magento2_magerun_create_admin:
+	sudo docker exec -it $(PHP_DOCKER) sh -c "php bin/magento admin:user:create"
+
+magento2_composer_install:
+	sudo docker exec -it --user 1000 $(PHP_DOCKER) sh -c "composer install"
+
+magento2_create_authjson:
+	sudo docker exec -it $(PHP_DOCKER) sh -c "composer install"
+
+magento2_grunt:
+	sudo docker exec -it $(PHP_DOCKER) sh -c "composer install"
+
+magento2_grunt_install:
+	sudo docker exec -it $(PHP_DOCKER) sh -c "cp Gruntfile.js.sample Grunfile.js"
+	sudo docker exec -it $(PHP_DOCKER) sh -c "npm install"
+
+magento2_gulp:
+	sudo docker exec -it $(PHP_DOCKER) sh -c "composer install"
+
+magento2_snowdog_install:
+	sudo docker exec -it $(PHP_DOCKER) sh -c "composer install"
+
+magento2_setup_upgrade:
+	sudo docker exec -it --user 1000:1000 $(PHP_DOCKER) sh -c "php bin/magento setup:upgrade "
+
+magento2_clear_cache:
+	sudo docker exec -it $(NGINX_DOCKER) sh -c "rm -rf var/cache/*; rm -rf var/session/*;"
+
+magento2_set_permissions:
+	sudo docker exec -it $(NGINX_DOCKER) sh -c "chmod 777 -R $(NGINX_WEB_ROOT)/var/ $(NGINX_WEB_ROOT)/pub/media $(NGINX_WEB_ROOT)/pub/static;"
+	sudo docker exec -it $(NGINX_DOCKER) sh -c "chown 1000:1000 $(NGINX_WEB_ROOT)/ -R;"
+	sudo docker exec -it $(NGINX_DOCKER) sh -c "chmod u+x ./bin/magento;"
+# 	sudo docker exec -it --user 1000:1000 $(NGINX_DOCKER) sh -c "find . -type f -exec chmod 644 {} \;"
+# 	sudo docker exec -it --user 1000:1000 $(NGINX_DOCKER) sh -c "find ./var -type d -exec chmod 777 {} \;"
+# 	sudo docker exec -it --user 1000:1000 $(NGINX_DOCKER) sh -c "find ./pub/media -type d -exec chmod 777 {} \;"
+# 	sudo docker exec -it --user 1000:1000 $(NGINX_DOCKER) sh -c "find ./pub/static -type d -exec chmod 777 {} \;"
+# 	sudo docker exec -it --user 1000:1000 $(NGINX_DOCKER) sh -c "chmod 777 ./app/etc;"
+# 	sudo docker exec -it --user 1000:1000 $(NGINX_DOCKER) sh -c "chmod 644 ./app/etc/*.xml"
+# 	sudo docker exec -it --user 1000:1000 $(NGINX_DOCKER) sh -c "chown 1000:1000 $(NGINX_WEB_ROOT)/"
+# 	sudo docker exec -it --user 1000:1000 $(NGINX_DOCKER) sh -c "chmod u+x ./bin/magento"
+
+# ETC 
+
 install_cron:
 	sudo docker exec -it $(NGINX_DOCKER) sh -c "apt-get update; apt-get install -y cron; apt-get install -y vim; export VISUAL=vim;"
 
@@ -118,12 +183,21 @@ docker_up:
 	sudo docker-compose up -d
 
 setup_magento:
-	make magento_update_baseurl
-	make magento_create_localxml
-	make magento_magerun_install
-	make magento_set_permissions
-	make magento_magerun_create_admin
+	make magento2_update_baseurl
+	make magento2_create_localxml
+	make magento2_magerun_install
+	make magento2_set_permissions
+	make magento2_magerun_create_admin
 # 	make magento_cron_setup
+
+setup_magento2:
+	make db_install_pv
+	make db_import_pv
+	make magento2_update_baseurl
+	make magento2_create_phpenv
+	make magento2_composer_install
+# 	make magento2_set_permissions
+# 	make magento2_magerun_create_admin
 
 install:
 	make docker_up
