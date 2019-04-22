@@ -12,12 +12,14 @@ services:
     expose:
       - 443
     links:
-      - db
       - php:container_php
+      - db
       - mail
-      - redis
+      - assets
+      # - redis
     depends_on:
       - php
+      - assets
     networks:
       container_net:
         ipv4_address: 172.22.0.101
@@ -53,15 +55,6 @@ services:
       container_net:
         ipv4_address: 172.22.0.103
 
-  redis:
-    container_name: container_redis
-    image: redis:alpine
-    ports:
-      - 6379:6379
-    networks:
-      container_net:
-        ipv4_address: 172.22.0.104
-
   mail:
     container_name: container_mailhog
     image: mailhog/mailhog
@@ -74,8 +67,22 @@ services:
       - 8025:8025
     networks:
       container_net:
-        ipv4_address: 172.22.0.105
+        ipv4_address: 172.22.0.104
 
+  assets:
+    container_name: container_assets
+    build:
+      context: .
+      dockerfile: ./assets/Dockerfile
+    volumes:
+     - ../web:/usr/share/nginx/www
+    ports:
+      - 9019:9019
+    tty: true
+    networks:
+      container_net:
+        ipv4_address: 172.22.0.105
+  
   adminer:
     container_name: container_adminer
     image: adminer
@@ -88,23 +95,34 @@ services:
     links:
       - db
 
-  memcached:
-    container_name: container_memcached
-    image: memcached:alpine
-    volumes:
-      - ./volumes/memcached/volume:/memcached
-    networks:
-      container_net:
-        ipv4_address: 172.22.0.107
+  # redis:
+  #   container_name: container_redis
+  #   image: redis:alpine
+  #   ports:
+  #     - 6379:6379
+  #   networks:
+  #     container_net:
+  #       ipv4_address: 172.22.0.107
 
-  elasticsearch:
-    container_name: container_elasticsearch
-    image: elasticsearch:6.5.4
-    volumes:
-      - ./volumes/elasticsearch/volume:/elasticsearch
-    networks:
-      container_net:
-        ipv4_address: 172.22.0.108
+  # memcached:
+  #   container_name: container_memcached
+  #   image: memcached:alpine
+  #   volumes:
+  #     - ./volumes/memcached/volume:/memcached
+  #   networks:
+  #     container_net:
+  #       ipv4_address: 172.22.0.108
+
+  # elasticsearch:
+  #   container_name: container_elasticsearch
+  #   image: elasticsearch:6.5.4
+  #   volumes:
+  #     - ./volumes/elasticsearch/volume:/elasticsearch
+  #   tty: true
+  #   networks:
+  #     container_net:
+  #       ipv4_address: 172.22.0.109
+
 
 networks:
   container_net:

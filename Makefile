@@ -13,6 +13,7 @@ PROJECT_NAME=magento2
 
 DOCKER_DIR=docker-php71
 
+ASSETS_DOCKER=container_assets
 NGINX_DOCKER=container_nginx
 PHP_DOCKER=container_php
 MYSQL_DOCKER=container_mysql
@@ -143,11 +144,21 @@ magento2_create_authjson:
 	sudo docker exec -it $(PHP_DOCKER) sh -c "composer install"
 
 magento2_grunt:
-	sudo docker exec -it $(PHP_DOCKER) sh -c "composer install"
+	sudo docker exec -it $(ASSETS_DOCKER) sh -c "grunt refresh; grunt watch"
+
+magento2_grunt_less:
+	sudo docker exec -it $(ASSETS_DOCKER) sh -c "grunt less:luma"
+
+magento2_grunt_exec:
+	sudo docker exec -it $(ASSETS_DOCKER) sh -c "grunt refresh; grunt exec"
+
+magento2_grunt_clean:
+	sudo docker exec -it $(ASSETS_DOCKER) sh -c "grunt clean"
 
 magento2_grunt_install:
-	sudo docker exec -it $(PHP_DOCKER) sh -c "cp Gruntfile.js.sample Grunfile.js"
-	sudo docker exec -it $(PHP_DOCKER) sh -c "npm install"
+	sudo docker exec -it $(ASSETS_DOCKER) sh -c "cp Gruntfile.js.sample Gruntfile.js"
+	sudo docker exec -it $(ASSETS_DOCKER) sh -c "cp package.json.sample package.json"
+	sudo docker exec -it $(ASSETS_DOCKER) sh -c "npm install"
 
 magento2_gulp:
 	sudo docker exec -it $(PHP_DOCKER) sh -c "composer install"
